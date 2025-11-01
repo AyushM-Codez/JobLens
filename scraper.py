@@ -32,9 +32,14 @@ class JobScraper:
         """
         jobs = []
         try:
+            # Security: Sanitize inputs to prevent URL injection
+            from urllib.parse import quote
+            safe_job_title = quote(str(job_title).strip()[:100])  # Limit length
+            safe_location = quote(str(location).strip()[:100])
+            
             # Example: Simple scraping structure (adapt based on actual site structure)
             # This is a template - real implementation would need to adapt to actual HTML structure
-            url = f"https://www.indeed.com/jobs?q={job_title}&l={location}"
+            url = f"https://www.indeed.com/jobs?q={safe_job_title}&l={safe_location}"
             response = requests.get(url, headers=self.headers, timeout=10)
             
             if response.status_code == 200:
@@ -137,8 +142,21 @@ class JobScraper:
         if filename is None:
             filename = f"jobs_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
+        # Security: Sanitize filename to prevent path traversal
+        import re
+        filename = re.sub(r'[^\w\-_\.]', '_', str(filename))[:100]  # Remove special chars, limit length
+        
+        # Ensure output directory exists
+        os.makedirs(self.output_dir, exist_ok=True)
+        
         # Save as JSON
         json_path = os.path.join(self.output_dir, f"{filename}.json")
+        # Additional security: Normalize path
+        json_path = os.path.normpath(json_path)
+        # Ensure path is within output directory
+        if not json_path.startswith(os.path.abspath(self.output_dir)):
+            raise ValueError("Invalid file path detected")
+        
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(jobs, f, indent=2, ensure_ascii=False)
         
@@ -150,6 +168,11 @@ class JobScraper:
             df = df.drop(columns=['skills_list'], errors='ignore')
         
         csv_path = os.path.join(self.output_dir, f"{filename}.csv")
+        csv_path = os.path.normpath(csv_path)
+        # Ensure path is within output directory
+        if not csv_path.startswith(os.path.abspath(self.output_dir)):
+            raise ValueError("Invalid file path detected")
+        
         df.to_csv(csv_path, index=False, encoding='utf-8')
         
         print(f"Saved {len(jobs)} jobs to {json_path} and {csv_path}")
@@ -157,6 +180,15 @@ class JobScraper:
     
     def load_jobs(self, filepath: str) -> List[Dict]:
         """Load jobs from JSON file."""
+        # Security: Normalize and validate file path
+        filepath = os.path.normpath(filepath)
+        
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"File not found: {filepath}")
+        
+        if not filepath.endswith('.json'):
+            raise ValueError("Only JSON files are supported for loading.")
+        
         with open(filepath, 'r', encoding='utf-8') as f:
             jobs = json.load(f)
         return jobs

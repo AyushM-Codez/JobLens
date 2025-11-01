@@ -8,6 +8,7 @@ import numpy as np
 from collections import Counter, defaultdict
 from typing import List, Dict, Tuple
 import json
+import os
 
 
 class SkillsAnalyzer:
@@ -19,14 +20,23 @@ class SkillsAnalyzer:
     
     def load_jobs(self, filepath: str) -> pd.DataFrame:
         """Load jobs from CSV or JSON file."""
+        # Security: Normalize path to prevent directory traversal
+        filepath = os.path.normpath(filepath)
+        
+        # Validate file extension
+        if not (filepath.endswith('.csv') or filepath.endswith('.json')):
+            raise ValueError("Unsupported file format. Use CSV or JSON.")
+        
+        # Check if file exists
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"File not found: {filepath}")
+        
         if filepath.endswith('.csv'):
             df = pd.read_csv(filepath)
         elif filepath.endswith('.json'):
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             df = pd.DataFrame(data)
-        else:
-            raise ValueError("Unsupported file format. Use CSV or JSON.")
         
         return df
     
@@ -37,11 +47,21 @@ class SkillsAnalyzer:
         if 'skills_list' in df.columns:
             # If skills are already in list format
             skills_lists = df['skills_list'].dropna().tolist()
-            # Convert to list if stored as string
-            skills_lists = [
-                eval(s) if isinstance(s, str) and s.startswith('[') else s
-                for s in skills_lists
-            ]
+            # Convert to list if stored as string (safe parsing using json.loads instead of eval)
+            parsed_lists = []
+            for s in skills_lists:
+                if isinstance(s, str) and s.startswith('['):
+                    try:
+                        parsed_lists.append(json.loads(s))
+                    except (json.JSONDecodeError, ValueError):
+                        # Fallback: treat as comma-separated string
+                        parsed_lists.append([skill.strip() for skill in s.strip('[]').split(',') if skill.strip()])
+                elif isinstance(s, list):
+                    parsed_lists.append(s)
+                else:
+                    # Handle other types
+                    parsed_lists.append([str(s)] if s else [])
+            skills_lists = parsed_lists
         elif 'skills' in df.columns:
             # If skills are in comma-separated string format
             skills_lists = df['skills'].dropna().apply(
@@ -178,6 +198,18 @@ class SkillsAnalyzer:
     
     def save_analysis(self, analysis: Dict, output_path: str):
         """Save analysis results to JSON."""
+        # Security: Normalize and validate output path
+        output_path = os.path.normpath(output_path)
+        
+        # Ensure output directory exists
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        
+        # Validate file extension
+        if not output_path.endswith('.json'):
+            raise ValueError("Output file must have .json extension")
+        
         # Convert DataFrames to dictionaries for JSON serialization
         json_analysis = {
             'total_jobs': analysis['total_jobs'],

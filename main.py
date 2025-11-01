@@ -46,11 +46,18 @@ def main():
     scraper = JobScraper()
     if args.skip_scrape and args.data_file:
         print(f"Loading existing data from {args.data_file}...")
-        if args.data_file.endswith('.csv'):
-            df = pd.read_csv(args.data_file)
+        # Security: Validate and sanitize input file path
+        import os
+        data_file = os.path.normpath(args.data_file)
+        if not os.path.exists(data_file):
+            print(f"  ✗ File not found: {data_file}")
+            return
+        
+        if data_file.endswith('.csv'):
+            df = pd.read_csv(data_file)
             jobs = df.to_dict('records')
         else:
-            jobs = scraper.load_jobs(args.data_file)
+            jobs = scraper.load_jobs(data_file)
     else:
         print("Step 1: Collecting job data...")
         print(f"  Searching for: {args.job_title} in {args.location or 'All locations'}")

@@ -304,8 +304,22 @@ class JobPredictor:
     
     def load_model(self, model_name: str):
         """Load a saved model."""
-        model_path = os.path.join(self.model_dir, f'{model_name}.pkl')
+        # Security: Sanitize model name to prevent path traversal
+        import re
+        safe_model_name = re.sub(r'[^\w\-_]', '_', str(model_name))[:50]
+        
+        model_path = os.path.join(self.model_dir, f'{safe_model_name}.pkl')
+        model_path = os.path.normpath(model_path)
+        
+        # Ensure path is within model directory
+        abs_model_dir = os.path.abspath(self.model_dir)
+        abs_model_path = os.path.abspath(model_path)
+        if not abs_model_path.startswith(abs_model_dir):
+            raise ValueError("Invalid model path detected")
+        
         if os.path.exists(model_path):
+            # Security: Only load pickle files from trusted sources
+            # In production, consider using a safer serialization format or verifying file integrity
             with open(model_path, 'rb') as f:
                 self.models[model_name] = pickle.load(f)
             return True
