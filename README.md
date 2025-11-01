@@ -1,4 +1,4 @@
-# 💼 Job Market Analyzer
+# 💼 Job Market Analyzer (currently under devlopment)
 
 **Job Market Analyzer** is a data-driven dashboard that helps uncover what’s really happening in today’s tech job market.  
 It scrapes real job listings, cleans the data, and uses NLP and visualization techniques to highlight the most in-demand skills, roles, and technologies.  
